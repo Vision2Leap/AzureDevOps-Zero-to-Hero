@@ -1,0 +1,49 @@
+## Pipeline used in live environment
+
+trigger: 
+- main
+
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Npm@1
+      inputs:
+        command: 'install'
+    - task: Npm@1
+      inputs:
+        command: 'custom'
+        customCommand: 'run build'
+   
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'build'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+# artifact produced from one stage is not accessible to another stage
+
+- stage: Deploy 
+  jobs:
+  - job: Deploy
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DownloadBuildArtifacts@1
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'drop'
+        downloadPath: '$(System.ArtifactsDirectory)'
+    
+    - task: AzureRmWebAppDeployment@4
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: 'piku_MS_Internal_Consumption (4cd8ed55-121e-4457-b098-c309b363fe96)'
+        appType: 'webAppLinux'
+        WebAppName: 'hostingwebsite'
+        packageForLinux: '$(System.ArtifactsDirectory)/drop'
+        RuntimeStack: 'STATICSITE|1.0'
